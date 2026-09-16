@@ -7,15 +7,15 @@ from datetime import datetime
 
 
 def prBlue(s, end="\n"):
-    print("\033[34m {}\033[00m".format(s), end=end)
+    print("\033[34m{}\033[00m".format(s), end=end)
 
 
 def prYellow(s, end="\n"):
-    print("\033[93m {}\033[00m".format(s), end=end)
+    print("\033[93m{}\033[00m".format(s), end=end)
 
 
 def prCyan(s, end="\n"):
-    print("\033[96m {}\033[00m".format(s), end=end)
+    print("\033[96m{}\033[00m".format(s), end=end)
 
 
 def build_parser():
@@ -59,7 +59,7 @@ def formatPermissionBits(permissions: int):
 
 def getType(entry: os.DirEntry):
     if entry.is_symlink():
-        return "-"
+        return "l"
     elif entry.is_dir():
         return "d"
     else:
