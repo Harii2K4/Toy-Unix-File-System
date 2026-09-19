@@ -1,5 +1,6 @@
 from datetime import datetime,UTC
 from enum import Enum
+import math
 
 
 USERS = {1:"zora"}
@@ -8,12 +9,16 @@ CURR_UID= 1
 CURR_GID = 1
 
 #Constants
-BLOCK_SIZE = 8 * 1024 #4KB
+BLOCK_SIZE = 4 * 1024 #4KB
 MEM_BLOCK_COUNT = 64
 
-DATA_OFFSET = 8 * BLOCK_SIZE
-INODE_OFFSET = 3 * BLOCK_SIZE
+DATA_OFFSET = 8
+DATA_OFFSET_MEM = 8 * BLOCK_SIZE
+INODE_OFFSET = 3
+INODE_OFFSET_MEM = INODE_OFFSET * BLOCK_SIZE
 INODE_COUNT = 0
+INODE_SIZE= 256 # 256 bytes
+INODES_PER_BLOCK = BLOCK_SIZE // 256 # 16 inodes for block
 
 # Idx 0 is the Super Block
 # Idx 1-2 are the bitmap blocks
@@ -21,10 +26,14 @@ INODE_COUNT = 0
 # Idx 8-63 are the data block (Used to store user data)
 DISK_MEMORY = [None] * MEM_BLOCK_COUNT
 
+#Global Variables
+curr_dir = "/"
+
 class Inode_Type(Enum):
     FILE = 1
     DIR = 2
     SYMBOLIC = 3
+
 
 #FileSystem Internal DS
 def create_inode(i_type:Inode_Type):
@@ -62,7 +71,7 @@ def create_inode(i_type:Inode_Type):
             "uid":CURR_UID,
             "gid":CURR_GID,
             "blocks":0,
-            "Size":0,
+            "size":0,
             "data_ptrs":[]
             }
 
