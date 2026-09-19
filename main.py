@@ -77,6 +77,45 @@ def create_inode(i_type:Inode_Type):
 
 
 #Access Functions
+#def stat(path):
+    #TODO:also account for relative paths
+
+def get_inode(inode):
+
+    #In reality the calculation is as follows
+    # INODE_OFFSET_MEM + ( INODE_SIZE * inode)  -> this will give the byte address
+    # But memory is not byte addressable so we need to find the sector.
+    # But here our memory is an array
+    iarray_idx =INODE_OFFSET+math.floor(inode/INODES_PER_BLOCK)
+    inode_array = DISK_MEMORY[iarray_idx]
+
+    if inode_array is None:
+        return []
+
+    idx= inode % INODES_PER_BLOCK
+    #TODO:catch index-error for inodes that dont exist
+    return inode_array[idx]
+
+
+# def write_dir(dir_table,name=".",inode):
+#     pass
+
+def filesystem_mkfs():
+
+    root_inode = create_inode(Inode_Type.DIR)
+    root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
+
+    #TODO:create the root directory table in memory
+    DISK_MEMORY[INODE_OFFSET] = [root_inode]
+    DISK_MEMORY[DATA_OFFSET] = root_dir_table # write the table into memory
+    #looks stupid why not just store the inode after data is stored? but empty inodes are created first
+    root_inode = get_inode(0)
+    root_inode["data_ptrs"].append(DATA_OFFSET)
+    root_inode["size"] =len(str(root_dir_table))
+    root_inode["blocks"] = 1
+
+    #TODO:need the change the bitmaps
+
 
 def main():
     print(create_inode(Inode_Type.FILE))
