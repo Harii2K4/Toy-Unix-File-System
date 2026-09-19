@@ -118,7 +118,14 @@ def filesystem_mkfs():
 
 
 def main():
-    print(create_inode(Inode_Type.FILE))
+
+    while True:
+        user=USERS[CURR_UID]
+        command = input(f"[{user} {curr_dir}]$ ")
+
+        if command.lower() == "exit":
+            return
+
 
 if __name__ == "__main__":
     main()
