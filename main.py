@@ -111,9 +111,29 @@ def read_dir(data_ptrs):
 
     return dir_table
 
+def read_dir_table_from_inode(inode):
+    inode_content = get_inode(inode)
+    if inode_content.mode.startswith("l") or inode_content.mode.startswith("_"):
+        raise Exception("Not a dir")
+    return read_dir(inode_content["data_ptrs"])
 
-def walk():
-    pass
+
+def walk(dir_table,path_tokens,curr_idx):
+    if curr_idx == len(path_tokens):
+        return
+
+    if path_tokens[curr_idx] == ".":
+        return walk(dir_table,path_tokens,curr_idx+1)
+
+    for entry in dir_table:
+        name,inode = entry
+        if path_tokens[curr_idx] == name:
+            token_dir_table=read_dir_table_from_inode(inode)
+            return walk(token_dir_table,path_tokens,curr_idx+1)
+
+    raise Exception("Not a dir")
+
+
 
 def stat(path):
     # for now only accepts absolute dir
