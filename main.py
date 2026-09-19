@@ -138,10 +138,26 @@ def walk(dir_table,path_tokens,curr_idx):
 
 def stat(path):
     # for now only accepts absolute dir
-    #TODO: add relative path support
+    #TODO: add relative path support and files and symbolic links
     path_tokens= path[1:].split("/")
-    root_inode = get_inode(0)
-    inode_content = walk(root_inode,path_tokens)
+    path_tokens = [token for token in path_tokens if token !=""]
+
+    if not path_tokens:
+        return get_inode(ROOT_INODE)
+
+    target_token = path_tokens.pop()
+    root_dir_table=read_dir_table_from_inode(0)
+
+    parent_dir_table= walk(root_dir_table,path_tokens,0)
+    target_inode = [inode for name,inode in dir_table if name == target_token]
+    assert len(target_inode) <=1
+
+    if len(target_inode) == 0:
+        raise Exception(f"{path}: No such file or dir")
+
+    target_inode_content = get_inode(target_inode[0])
+    return target_inode_content
+
 
 
 def filesystem_mkfs():
@@ -173,6 +189,6 @@ def main():
 
 if __name__ == "__main__":
     filesystem_mkfs()
-    print(read_dir(get_inode(0)["data_ptrs"]))
+    print(stat("\\"))
     # main()
 
