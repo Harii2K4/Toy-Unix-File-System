@@ -17,6 +17,7 @@ DATA_OFFSET_MEM = 8 * BLOCK_SIZE
 INODE_OFFSET = 3
 INODE_OFFSET_MEM = INODE_OFFSET * BLOCK_SIZE
 INODE_COUNT = 0
+ROOT_INODE = 0
 INODE_SIZE= 256 # 256 bytes
 INODES_PER_BLOCK = BLOCK_SIZE // 256 # 16 inodes for block
 
@@ -152,7 +153,7 @@ def filesystem_mkfs():
     DISK_MEMORY[INODE_OFFSET] = [root_inode]
     DISK_MEMORY[DATA_OFFSET] = root_dir_table # write the table into memory
     #looks stupid why not just store the inode after data is stored? but empty inodes are created first
-    root_inode = get_inode(0)
+    root_inode = get_inode(ROOT_INODE)
     root_inode["data_ptrs"].append(DATA_OFFSET)
     root_inode["size"] =len(str(root_dir_table))
     root_inode["blocks"] = 1
