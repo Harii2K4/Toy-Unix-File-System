@@ -134,6 +134,36 @@ def walk(dir_table,path_tokens,curr_idx):
 
     raise Exception("Not a dir")
 
+def print_inode(inode_obj,path):
+        user_name = USERS[inode_obj['uid']]
+        grp_name= USERS[inode_obj['gid']]
+        mode =inode_obj['mode']
+
+        match(mode[0]):
+            case "_":
+                i_type = "regular file"
+            case "d":
+                i_type = "directory"
+            case "l":
+                i_type = "symbolic link"
+
+        formatted_mode =""
+        for mode_num in mode[1:]:
+            bits= format(int(mode_num),"b")
+            read_bit = "-" if bits[0] == "0" else "r"
+            write_bit = "-" if bits[1] == "0" else "w"
+            exec_bit = "-" if bits[2] == "0" else "x"
+            formatted_mode+= f"{read_bit}{write_bit}{exec_bit}"
+
+        formatted_mode = mode[0]+formatted_mode
+
+        print(f"  File: {path}")
+        print(f"  Size: {inode_obj['size']}        Blocks: {inode_obj['blocks']} {i_type}" )
+        print(f" Inode: {inode_obj['inode']}         Links: {inode_obj['link_count']}")
+        print(f"  Mode: {formatted_mode}  Uid: ({inode_obj['uid']}/{user_name})  Gid: ({inode_obj['gid']}/{grp_name})")
+        print(f"Access: {datetime.fromtimestamp(inode_obj['a_time'])}")
+        print(f"Modify: {datetime.fromtimestamp(inode_obj['m_time'])}")
+        print(f" Birth: {datetime.fromtimestamp(inode_obj['b_time'])}")
 
 
 def stat(path):
@@ -143,7 +173,9 @@ def stat(path):
     path_tokens = [token for token in path_tokens if token !=""]
 
     if not path_tokens:
-        return get_inode(ROOT_INODE)
+        target_inode_obj=get_inode(ROOT_INODE)
+        print_inode(target_inode_obj,path)
+        return
 
     target_token = path_tokens.pop()
     root_dir_table=read_dir_table_from_inode(0)
@@ -155,8 +187,9 @@ def stat(path):
     if len(target_inode) == 0:
         raise Exception(f"{path}: No such file or dir")
 
-    target_inode_content = get_inode(target_inode[0])
-    return target_inode_content
+    target_inode_obj = get_inode(target_inode[0])
+    print_inode(target_inode_obj,path)
+    return
 
 
 
@@ -189,6 +222,5 @@ def main():
 
 if __name__ == "__main__":
     filesystem_mkfs()
-    print(stat("\\"))
-    # main()
+    main()
 
