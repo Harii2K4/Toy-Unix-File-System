@@ -77,8 +77,7 @@ def create_inode(i_type:Inode_Type):
 
 
 #Access Functions
-#def stat(path):
-    #TODO:also account for relative paths
+
 
 def get_inode(inode):
 
@@ -97,8 +96,32 @@ def get_inode(inode):
     return inode_array[idx]
 
 
-# def write_dir(dir_table,name=".",inode):
-#     pass
+def write_dir(dir_table,name,inode):
+    pass
+
+def read_dir(data_ptrs):
+    if data_ptrs is None or len(data_ptrs) == 0:
+        return []
+
+    dir_table =[]
+
+    #This is so wrong in many diffrent ways but for now lets stick to it
+    for data_ptr in data_ptrs:
+        dir_table.extend(DISK_MEMORY[data_ptr])
+
+    return dir_table
+
+
+def walk():
+    pass
+
+def stat(path):
+    # for now only accepts absolute dir
+    #TODO: add relative path support
+    path_tokens= path[1:].split("/")
+    root_inode = get_inode(0)
+    inode_content = walk(root_inode,path_tokens)
+
 
 def filesystem_mkfs():
 
@@ -128,5 +151,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    filesystem_mkfs()
+    print(read_dir(get_inode(0)["data_ptrs"]))
+    # main()
 
