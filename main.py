@@ -116,13 +116,13 @@ def read_dir(data_ptrs):
 def read_dir_table_from_inode(inode):
     inode_content = get_inode(inode)
     if inode_content['mode'].startswith("l") or inode_content['mode'].startswith("_"):
-        raise Exception("Not a dir")
+        raise Exception("Not a directory")
     return read_dir(inode_content["data_ptrs"])
 
 
 def walk(dir_table,path_tokens,curr_idx):
     if curr_idx == len(path_tokens):
-        return
+        return []
 
     if path_tokens[curr_idx] == ".":
         return walk(dir_table,path_tokens,curr_idx+1)
@@ -133,7 +133,7 @@ def walk(dir_table,path_tokens,curr_idx):
             token_dir_table=read_dir_table_from_inode(inode)
             return walk(token_dir_table,path_tokens,curr_idx+1)
 
-    raise Exception("Not a dir")
+    raise Exception("No such file or directory")
 
 def print_inode(inode_obj,path):
         user_name = USERS[inode_obj['uid']]
