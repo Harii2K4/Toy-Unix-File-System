@@ -166,12 +166,16 @@ def print_inode(inode_obj,path):
         print(f"Modify: {datetime.fromtimestamp(inode_obj['m_time'])}")
         print(f" Birth: {datetime.fromtimestamp(inode_obj['b_time'])}")
 
+def tokenize_path(path):
+    path_tokens= path[1:].split("/")
+    path_tokens = [token for token in path_tokens if token !=""]
+
+    return path_tokens
 
 def stat(path):
     # for now only accepts absolute dir
     #TODO: add relative path support and files and symbolic links
-    path_tokens= path[1:].split("/")
-    path_tokens = [token for token in path_tokens if token !=""]
+    path_tokens= tokenize_path(path)
 
     if not path_tokens:
         target_inode_obj=get_inode(ROOT_INODE)
