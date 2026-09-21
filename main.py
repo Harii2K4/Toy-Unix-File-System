@@ -183,14 +183,14 @@ def stat(path):
         return
 
     target_token = path_tokens.pop()
-    root_dir_table=read_dir_table_from_inode(0)
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE)
 
     parent_dir_table= walk(root_dir_table,path_tokens,0)
-    target_inode = [inode for name,inode in dir_table if name == target_token]
+    target_inode = [inode for name,inode in parent_dir_table if name == target_token]
     assert len(target_inode) <=1
 
     if len(target_inode) == 0:
-        raise Exception(f"{path}: No such file or dir")
+        raise Exception(f" No such file or dir")
 
     target_inode_obj = get_inode(target_inode[0])
     print_inode(target_inode_obj,path)
