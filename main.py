@@ -115,7 +115,7 @@ def read_dir(data_ptrs):
 
 def read_dir_table_from_inode(inode):
     inode_content = get_inode(inode)
-    if inode_content.mode.startswith("l") or inode_content.mode.startswith("_"):
+    if inode_content['mode'].startswith("l") or inode_content['mode'].startswith("_"):
         raise Exception("Not a dir")
     return read_dir(inode_content["data_ptrs"])
 
