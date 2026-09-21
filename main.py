@@ -37,6 +37,14 @@ class Inode_Type(Enum):
     DIR = 2
     SYMBOLIC = 3
 
+def prBlue(s, end="\n"):
+    print("\033[34m{}\033[00m".format(s), end=end)
+
+def prYellow(s, end="\n"):
+    print("\033[93m{}\033[00m".format(s), end=end)
+
+def prCyan(s, end="\n"):
+    print("\033[96m{}\033[00m".format(s), end=end)
 
 #FileSystem Internal DS
 def create_inode(i_type:Inode_Type):
@@ -203,6 +211,7 @@ def stat(path):
     print_inode(target_inode_obj,path)
     return
 
+
 def getEntryMetadata(inode_obj,name,size_width=0):
     # -rw-r--r-- 1 zoraonice zoraonice 1360 Sep 14 18:33 file_tree_with_txt.py
     links = inode_obj["link_count"]
@@ -218,14 +227,23 @@ def getEntryMetadata(inode_obj,name,size_width=0):
         f"{links} {user} {group} {size:>{size_width}} {date} {name}"
     )
 
-def print_table(entries):
-    inode_objs =[(name,get_inode(inode)) for name,inode in entries]
+def print_table(inode_objs):
     max_size = max((inode_obj["size"] for _,inode_obj in inode_objs),default=0)
     size_width = len(str(max_size))
 
     for name,inode_content in inode_objs:
-        row =getEntryMetadata(inode_content,name,size_width)
-        print(row)
+        row = getEntryMetadata(inode_content,name,size_width)
+        obj_type=inode_content['mode'][0]
+        match obj_type:
+            case "_":
+                if name.startswith("."):
+                    print(row,end="\n")
+                else:
+                    prYellow(row,end="\n")
+            case "l":
+                prCyan(row,end="\n")
+            case "d":
+                prBlue(row,end="\n")
 
 def ls(path,show_hidden=False,display_table=False):
     path_tokens= tokenize_path(path)
@@ -239,15 +257,26 @@ def ls(path,show_hidden=False,display_table=False):
     if not show_hidden:
         entries = filter(lambda x: not x[0].startswith("."),entries)
 
+    inode_objs =[(name,get_inode(inode)) for name,inode in entries]
+
     if display_table:
-        print_table(entries)
+        print_table(inode_objs)
     else:
-        for name,inode in entries:
-            print(name,end=" ")
-        print()
+        for name,inode in inode_objs:
+            obj_type=inode_objs[1]['mode'][0]
+            match obj_type:
+                case "_":
+                    if name.startswith("."):
+                        print(name,end=" ")
+                    else:
+                        prYellow(name,end=end)
+                case "l":
+                    prCyan(name,end=" ")
+                case "d":
+                    prBlue(name,end=" ")
+    print()
 
 def filesystem_mkfs():
-
     root_inode = create_inode(Inode_Type.DIR)
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
 
