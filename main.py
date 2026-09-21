@@ -1,7 +1,8 @@
 from datetime import datetime,UTC
 from enum import Enum
 import math
-
+import sys
+import argparse
 
 USERS = {1:"zora"}
 GROUPS = {1:"zora"}
@@ -209,15 +210,46 @@ def filesystem_mkfs():
 
     #TODO:need the change the bitmaps
 
+#Cli parser - simple shell
+def parser_init():
+    parser = argparse.ArgumentParser(
+                    prog='File system shell',
+                    description='Simple command like to plan with the file system ',
+                    epilog='help for the help menu and exit to exit the shell')
+
+
+    subparsers=parser.add_subparsers(title="Command",dest="command",help="subparser help command")
+
+    exit_parser=subparsers.add_parser("exit",help='Use to exit the shell')
+
+    ls_parser = subparsers.add_parser('ls', help='Use to list the directory content')
+    ls_parser.add_argument('-a',default=False,action='store_true')
+
+    stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
+    stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
+
+
+    return parser
+
 
 def main():
+    parser=parser_init()
 
     while True:
         user=USERS[CURR_UID]
-        command = input(f"[{user} {curr_dir}]$ ")
+        user_input= input(f"[{user} {curr_dir}]$ ")
+        input_tokens = user_input.split(" ")
 
-        if command.lower() == "exit":
-            return
+        parsed_args=parser.parse_args(input_tokens)
+
+        match parsed_args.command:
+            case "ls":
+                print("not implemented")
+            case "exit":
+                return
+            case "stat":
+                stat(parsed_args.path)
+
 
 
 if __name__ == "__main__":
