@@ -32,6 +32,7 @@ DISK_MEMORY = [None] * MEM_BLOCK_COUNT
 #Global Variables
 curr_dir = "/"
 
+
 class Inode_Type(Enum):
     FILE = 1
     DIR = 2
@@ -111,7 +112,7 @@ def get_inode(inode_number):
 
 def write_dir(dir_table,name,inode_number):
     for existing_name,_ in dir_table:
-        if exsting_name == name:
+        if existing_name == name:
             raise Exception("File exists")
 
     dir_table.append((name,inode_number))
@@ -250,6 +251,7 @@ def ls(path,show_hidden=False,display_table=False):
 
     if not path_tokens:
         entries=root_dir_table
+        print(entries)
     else:
         entries=walk(root_dir_table,path_tokens,0)
 
@@ -277,6 +279,68 @@ def ls(path,show_hidden=False,display_table=False):
 
     print()
 
+def mkdir(path):
+    #1)Increment link count of parent
+    #2)Create new_dir inode and dir_table
+    #3)add the name,inode to parent
+    #Done in this order to recover from crashes (got it so wrong the first time)
+
+    path_tokens = tokenize_path(path)
+    new_dir = path_tokens.pop()
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+
+    if not path_tokens:
+        parent_dir_table=root_dir_table
+    else:
+        parent_dir_table=walk(root_dir_table,path_tokens,0)
+
+    parent_inode_number = None
+    for name,inode_number in parent_dir_table:
+        if name == ".":
+            parent_inode_number =inode_number
+            break
+    assert parent_inode_number is not None
+    parent_inode = get_inode(parent_inode_number)
+    parent_inode["link_count"]+=1
+
+    new_dir_inode = create_inode(Inode_Type.DIR)
+    new_dir_inode_number = new_dir_inode["inode"]
+    allocated=False
+
+    new_dir_table =[(".",new_dir_inode.get("inode")),("..",parent_inode.get("inode"))]
+
+    #TODO:use the bitmaps instead
+    for idx in range(DATA_OFFSET,64):
+        if DISK_MEMORY[idx] is None:
+            DISK_MEMORY[idx] = new_dir_table
+            break
+
+    #TODO:get the proper sizes
+    new_dir_inode["data_ptrs"].append(idx)
+    new_dir_inode["size"] =len(str(new_dir_table))
+    new_dir_inode["blocks"] = 1
+
+    #TODO:use the bitmaps instead
+    for inode_block in range(INODE_OFFSET,DATA_OFFSET):
+        for idx in range(0,INODES_PER_BLOCK):
+            try :
+                if DISK_MEMORY[inode_block][idx] is not None:
+                    continue
+            except Exception:
+                DISK_MEMORY[inode_block].append(new_dir_inode)
+                allocated=True
+                break
+            DISK_MEMORY[inode_block][idx] = new_dir_inode
+            allocated=True
+            break
+
+        if allocated:
+            break
+
+    write_dir(parent_dir_table,new_dir,new_dir_inode_number)
+    print(parent_dir_table,parent_inode_number)
+    return
+
 def filesystem_mkfs():
     root_inode = create_inode(Inode_Type.DIR)
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
@@ -302,12 +366,15 @@ def parser_init():
 
     subparsers=parser.add_subparsers(title="Command",dest="command",help="subparser help command")
 
-    exit_parser=subparsers.add_parser("exit",help='Use to exit the shell')
+    exit_parser=subparsers.add_parser("exit",help='Exit the shell')
 
-    ls_parser = subparsers.add_parser('ls', help='Use to list the directory content')
+    ls_parser = subparsers.add_parser('ls', help='List the directory content')
     ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
     ls_parser.add_argument('-a',default=False,action='store_true')
     ls_parser.add_argument('-l',default=False,action='store_true')
+
+    ls_parser = subparsers.add_parser('mkdir', help='Creat a new directory')
+    ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
     stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
     stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
@@ -331,7 +398,10 @@ def main():
                 except Exception as e:
                     print(f"ls: cannot access {parsed_args.path}: {e}")
             case "exit":
+                print(DISK_MEMORY)
                 return
+            case "mkdir":
+                mkdir(parsed_args.path)
             case "stat":
                 try:
                     stat(parsed_args.path)
