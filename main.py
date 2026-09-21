@@ -199,11 +199,12 @@ def stat(path):
 def ls(path,show_hidden=False):
     #TODO:implement relative paths
     path_tokens= tokenize_path(path)
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE)
 
     if not path_tokens:
-        parent_dir_table=read_dir_table_from_inode(0,"/")
+        parent_dir_table=root_dir_table
     else:
-        parent_dir_table= walk(read_dir_table_from_inode(0,"/"),path_tokens,0,path)
+        parent_dir_table= walk(root_dir_table,path_tokens,0)
 
     entries = [name for name,inode in parent_dir_table]
 
