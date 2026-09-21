@@ -264,12 +264,18 @@ def main():
 
         match parsed_args.command:
             case "ls":
-                ls(parsed_args.path,parsed_args.a)
+                try:
+                    ls(parsed_args.path,parsed_args.a)
+                except Exception as e:
+                    print(f"ls: cannot access {parsed_args.path}: {e}")
             case "exit":
                 return
             case "stat":
-                stat(parsed_args.path)
-
+                try:
+                    stat(parsed_args.path)
+                except Exception as e:
+                    print(f"stat: cannot statx {parsed_args.path}: {e}")
+        print()
 
 
 if __name__ == "__main__":
