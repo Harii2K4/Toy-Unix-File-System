@@ -4,6 +4,7 @@ import math
 import sys
 import argparse
 
+#this is the root user
 USERS = {1:"zora"}
 GROUPS = {1:"zora"}
 CURR_UID= 1
@@ -94,8 +95,10 @@ def get_inode(inode):
         return []
 
     idx= inode % INODES_PER_BLOCK
-    #TODO:catch index-error for inodes that dont exist
-    return inode_array[idx]
+    try :
+        return inode_array[idx]
+    except IndexError:
+        raise Exception("No such file or directory")
 
 
 def write_dir(dir_table,name,inode):
@@ -135,6 +138,16 @@ def walk(dir_table,path_tokens,curr_idx):
 
     raise Exception("No such file or directory")
 
+def format_permissions(mode):
+    permission_bits =""
+    for mode_num in mode:
+        bits= format(int(mode_num),"b")
+        read_bit = "-" if bits[0] == "0" else "r"
+        write_bit = "-" if bits[1] == "0" else "w"
+        exec_bit = "-" if bits[2] == "0" else "x"
+        permission_bits+= f"{read_bit}{write_bit}{exec_bit}"
+    return permission_bits
+
 def print_inode(inode_obj,path):
         user_name = USERS[inode_obj['uid']]
         grp_name= USERS[inode_obj['gid']]
@@ -148,14 +161,7 @@ def print_inode(inode_obj,path):
             case "l":
                 i_type = "symbolic link"
 
-        formatted_mode =""
-        for mode_num in mode[1:]:
-            bits= format(int(mode_num),"b")
-            read_bit = "-" if bits[0] == "0" else "r"
-            write_bit = "-" if bits[1] == "0" else "w"
-            exec_bit = "-" if bits[2] == "0" else "x"
-            formatted_mode+= f"{read_bit}{write_bit}{exec_bit}"
-
+        formatted_mode = format_permissions(mode[1:])
         formatted_mode = mode[0]+formatted_mode
 
         print(f"  File: {path}")
@@ -167,6 +173,7 @@ def print_inode(inode_obj,path):
         print(f" Birth: {datetime.fromtimestamp(inode_obj['b_time'])}")
 
 def tokenize_path(path):
+    #TODO: add relative path support and files and symbolic links
     path_tokens= path[1:].split("/")
     path_tokens = [token for token in path_tokens if token !=""]
 
@@ -174,7 +181,7 @@ def tokenize_path(path):
 
 def stat(path):
     # for now only accepts absolute dir
-    #TODO: add relative path support and files and symbolic links
+    #TODO: add support files and symbolic links
     path_tokens= tokenize_path(path)
 
     if not path_tokens:
@@ -190,30 +197,54 @@ def stat(path):
     assert len(target_inode) <=1
 
     if len(target_inode) == 0:
-        raise Exception(f" No such file or dir")
+        raise Exception("No such file or dir")
 
     target_inode_obj = get_inode(target_inode[0])
     print_inode(target_inode_obj,path)
     return
 
-def ls(path,show_hidden=False):
-    #TODO:implement relative paths
+def getEntryMetadata(inode_obj,name,size_width=0):
+    # -rw-r--r-- 1 zoraonice zoraonice 1360 Sep 14 18:33 file_tree_with_txt.py
+    links = inode_obj["link_count"]
+    user = USERS[inode_obj["uid"]]
+    group = GROUPS[inode_obj["gid"]]
+    size = inode_obj["size"]
+    date = datetime.fromtimestamp(inode_obj["m_time"])
+    date = date.strftime("%b %-d %H:%M")
+    entry_type = inode_obj["mode"][0]
+    permissions_bits = format_permissions(inode_obj["mode"][1:])
+    return (
+        f"{entry_type}{permissions_bits} "
+        f"{links} {user} {group} {size:>{size_width}} {date} {name}"
+    )
+
+def print_table(entries):
+    inode_objs =[(name,get_inode(inode)) for name,inode in entries]
+    max_size = max((inode_obj["size"] for _,inode_obj in inode_objs),default=0)
+    size_width = len(str(max_size))
+
+    for name,inode_content in inode_objs:
+        row =getEntryMetadata(inode_content,name,size_width)
+        print(row)
+
+def ls(path,show_hidden=False,display_table=False):
     path_tokens= tokenize_path(path)
     root_dir_table=read_dir_table_from_inode(ROOT_INODE)
 
     if not path_tokens:
-        parent_dir_table=root_dir_table
+        entries=root_dir_table
     else:
-        parent_dir_table= walk(root_dir_table,path_tokens,0)
-
-    entries = [name for name,inode in parent_dir_table]
+        entries=walk(root_dir_table,path_tokens,0)
 
     if not show_hidden:
-        entries = filter(lambda x: not x.startswith("."),entries)
+        entries = filter(lambda x: not x[0].startswith("."),entries)
 
-    for entry in entries:
-        print(entry,end=" ")
-    print()
+    if display_table:
+        print_table(entries)
+    else:
+        for name,inode in entries:
+            print(name,end=" ")
+        print()
 
 def filesystem_mkfs():
 
@@ -246,6 +277,7 @@ def parser_init():
     ls_parser = subparsers.add_parser('ls', help='Use to list the directory content')
     ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
     ls_parser.add_argument('-a',default=False,action='store_true')
+    ls_parser.add_argument('-l',default=False,action='store_true')
 
     stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
     stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
@@ -265,7 +297,7 @@ def main():
         match parsed_args.command:
             case "ls":
                 try:
-                    ls(parsed_args.path,parsed_args.a)
+                    ls(parsed_args.path,parsed_args.a,parsed_args.l)
                 except Exception as e:
                     print(f"ls: cannot access {parsed_args.path}: {e}")
             case "exit":
@@ -275,8 +307,6 @@ def main():
                     stat(parsed_args.path)
                 except Exception as e:
                     print(f"stat: cannot statx {parsed_args.path}: {e}")
-        print()
-
 
 if __name__ == "__main__":
     filesystem_mkfs()
