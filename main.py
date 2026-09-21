@@ -196,7 +196,23 @@ def stat(path):
     print_inode(target_inode_obj,path)
     return
 
+def ls(path,show_hidden=False):
+    #TODO:implement relative paths
+    path_tokens= tokenize_path(path)
 
+    if not path_tokens:
+        parent_dir_table=read_dir_table_from_inode(0,"/")
+    else:
+        parent_dir_table= walk(read_dir_table_from_inode(0,"/"),path_tokens,0,path)
+
+    entries = [name for name,inode in parent_dir_table]
+
+    if not show_hidden:
+        entries = filter(lambda x: not x.startswith("."),entries)
+
+    for entry in entries:
+        print(entry,end=" ")
+    print()
 
 def filesystem_mkfs():
 
@@ -227,14 +243,13 @@ def parser_init():
     exit_parser=subparsers.add_parser("exit",help='Use to exit the shell')
 
     ls_parser = subparsers.add_parser('ls', help='Use to list the directory content')
+    ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
     ls_parser.add_argument('-a',default=False,action='store_true')
 
     stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
     stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
-
     return parser
-
 
 def main():
     parser=parser_init()
@@ -248,7 +263,7 @@ def main():
 
         match parsed_args.command:
             case "ls":
-                print("not implemented")
+                ls(parsed_args.path,parsed_args.a)
             case "exit":
                 return
             case "stat":
