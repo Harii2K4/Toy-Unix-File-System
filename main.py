@@ -227,23 +227,18 @@ def getEntryMetadata(inode_obj,name,size_width=0):
         f"{links} {user} {group} {size:>{size_width}} {date} {name}"
     )
 
-def print_table(inode_objs):
-    max_size = max((inode_obj["size"] for _,inode_obj in inode_objs),default=0)
-    size_width = len(str(max_size))
 
-    for name,inode_content in inode_objs:
-        row = getEntryMetadata(inode_content,name,size_width)
-        obj_type=inode_content['mode'][0]
-        match obj_type:
-            case "_":
-                if name.startswith("."):
-                    print(row,end="\n")
-                else:
-                    prYellow(row,end="\n")
-            case "l":
-                prCyan(row,end="\n")
-            case "d":
-                prBlue(row,end="\n")
+def pretty_print(content,obj_type,hidden,end=" "):
+    match obj_type:
+        case "_":
+            if hiddent:
+                print(content,end=end)
+            else:
+                prYellow(content,end=end)
+        case "l":
+            prCyan(content,end=end)
+        case "d":
+            prBlue(content,end=end)
 
 def ls(path,show_hidden=False,display_table=False):
     path_tokens= tokenize_path(path)
@@ -260,20 +255,22 @@ def ls(path,show_hidden=False,display_table=False):
     inode_objs =[(name,get_inode(inode)) for name,inode in entries]
 
     if display_table:
-        print_table(inode_objs)
+        max_size = max((inode_obj["size"] for _,inode_obj in inode_objs),default=0)
+        # l pad for size column
+        size_width = len(str(max_size))
+
+        for name,inode in inode_objs:
+            row = getEntryMetadata(inode,name,size_width)
+            obj_type=inode['mode'][0]
+            hidden = True if name.startswith(".") else False
+            pretty_print(row,obj_type,hidden,end="\n")
+
     else:
         for name,inode in inode_objs:
-            obj_type=inode_objs[1]['mode'][0]
-            match obj_type:
-                case "_":
-                    if name.startswith("."):
-                        print(name,end=" ")
-                    else:
-                        prYellow(name,end=end)
-                case "l":
-                    prCyan(name,end=" ")
-                case "d":
-                    prBlue(name,end=" ")
+            obj_type=inode['mode'][0]
+            hidden = True if name.startswith(".") else False
+            pretty_print(name,e,obj_type,hidden,end="\n")
+
     print()
 
 def filesystem_mkfs():
