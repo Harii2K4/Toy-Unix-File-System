@@ -19,7 +19,7 @@ DATA_OFFSET_MEM = 8 * BLOCK_SIZE
 INODE_OFFSET = 3
 INODE_OFFSET_MEM = INODE_OFFSET * BLOCK_SIZE
 INODE_COUNT = 0
-ROOT_INODE = 0
+ROOT_INODE_NUM = 0
 INODE_SIZE= 256 # 256 bytes
 INODES_PER_BLOCK = BLOCK_SIZE // 256 # 16 inodes for block
 
@@ -90,27 +90,31 @@ def create_inode(i_type:Inode_Type):
 #Access Functions
 
 
-def get_inode(inode):
+def get_inode(inode_number):
 
     #In reality the calculation is as follows
     # INODE_OFFSET_MEM + ( INODE_SIZE * inode)  -> this will give the byte address
     # But memory is not byte addressable so we need to find the sector.
     # But here our memory is an array
-    iarray_idx =INODE_OFFSET+math.floor(inode/INODES_PER_BLOCK)
+    iarray_idx =INODE_OFFSET+math.floor(inode_number/INODES_PER_BLOCK)
     inode_array = DISK_MEMORY[iarray_idx]
 
     if inode_array is None:
         return []
 
-    idx= inode % INODES_PER_BLOCK
+    idx= inode_number % INODES_PER_BLOCK
     try :
         return inode_array[idx]
     except IndexError:
         raise Exception("No such file or directory")
 
 
-def write_dir(dir_table,name,inode):
-    pass
+def write_dir(dir_table,name,inode_number):
+    for existing_name,_ in dir_table:
+        if exsting_name == name:
+            raise Exception("File exists")
+
+    dir_table.append((name,inode_number))
 
 def read_dir(data_ptrs):
     if data_ptrs is None or len(data_ptrs) == 0:
@@ -124,8 +128,8 @@ def read_dir(data_ptrs):
 
     return dir_table
 
-def read_dir_table_from_inode(inode):
-    inode_content = get_inode(inode)
+def read_dir_table_from_inode(inode_number):
+    inode_content = get_inode(inode_number)
     if inode_content['mode'].startswith("l") or inode_content['mode'].startswith("_"):
         raise Exception("Not a directory")
     return read_dir(inode_content["data_ptrs"])
@@ -139,9 +143,9 @@ def walk(dir_table,path_tokens,curr_idx):
         return walk(dir_table,path_tokens,curr_idx+1)
 
     for entry in dir_table:
-        name,inode = entry
+        name,inode_number = entry
         if path_tokens[curr_idx] == name:
-            token_dir_table=read_dir_table_from_inode(inode)
+            token_dir_table=read_dir_table_from_inode(inode_number)
             return walk(token_dir_table,path_tokens,curr_idx+1)
 
     raise Exception("No such file or directory")
@@ -193,15 +197,15 @@ def stat(path):
     path_tokens= tokenize_path(path)
 
     if not path_tokens:
-        target_inode_obj=get_inode(ROOT_INODE)
+        target_inode_obj=get_inode(ROOT_INODE_NUM)
         print_inode(target_inode_obj,path)
         return
 
     target_token = path_tokens.pop()
-    root_dir_table=read_dir_table_from_inode(ROOT_INODE)
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
     parent_dir_table= walk(root_dir_table,path_tokens,0)
-    target_inode = [inode for name,inode in parent_dir_table if name == target_token]
+    target_inode = [inode_number for name,inode_number in parent_dir_table if name == target_token]
     assert len(target_inode) <=1
 
     if len(target_inode) == 0:
@@ -242,7 +246,7 @@ def pretty_print(content,obj_type,hidden,end=" "):
 
 def ls(path,show_hidden=False,display_table=False):
     path_tokens= tokenize_path(path)
-    root_dir_table=read_dir_table_from_inode(ROOT_INODE)
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
     if not path_tokens:
         entries=root_dir_table
@@ -252,7 +256,7 @@ def ls(path,show_hidden=False,display_table=False):
     if not show_hidden:
         entries = filter(lambda x: not x[0].startswith("."),entries)
 
-    inode_objs =[(name,get_inode(inode)) for name,inode in entries]
+    inode_objs =[(name,get_inode(inode_number)) for name,inode_number in entries]
 
     if display_table:
         max_size = max((inode_obj["size"] for _,inode_obj in inode_objs),default=0)
@@ -281,7 +285,7 @@ def filesystem_mkfs():
     DISK_MEMORY[INODE_OFFSET] = [root_inode]
     DISK_MEMORY[DATA_OFFSET] = root_dir_table # write the table into memory
     #looks stupid why not just store the inode after data is stored? but empty inodes are created first
-    root_inode = get_inode(ROOT_INODE)
+    root_inode = get_inode(ROOT_INODE_NUM)
     root_inode["data_ptrs"].append(DATA_OFFSET)
     root_inode["size"] =len(str(root_dir_table))
     root_inode["blocks"] = 1

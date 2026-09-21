@@ -7,7 +7,7 @@ Underlying Data structures :
     Conceptual Tree 
 Access Functions: 
     read(), write(),open() -> files
-    readdir() , writedir() ,opendir()->  directory
+    readdir() , writedir()->  directory
     stat() -> to view inodes 
     unlink() , link() 
 
