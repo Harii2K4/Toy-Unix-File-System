@@ -109,13 +109,19 @@ def get_inode(inode_number):
     except IndexError:
         raise Exception("No such file or directory")
 
+def read_mem(data_ptr):
+    global DISK_MEMORY
+    try:
+        return DISK_MEMORY[data_ptr]
+    except IndexError:
+        raise Exception(f"Data not found in memory: {data_ptr}")
 
-def write_dir(dir_table,name,inode_number):
-    for existing_name,_ in dir_table:
+def write_dir(mem_block,name,inode_number):
+    for existing_name,_ in mem_block:
         if existing_name == name:
             raise Exception("File exists")
 
-    dir_table.append((name,inode_number))
+    mem_block.append((name,inode_number))
 
 def read_dir(data_ptrs):
     if data_ptrs is None or len(data_ptrs) == 0:
