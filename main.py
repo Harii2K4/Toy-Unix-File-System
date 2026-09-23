@@ -209,14 +209,12 @@ def print_inode(inode_obj,path):
         print(f" Birth: {datetime.fromtimestamp(inode_obj['b_time'])}")
 
 def tokenize_path(path):
-    #TODO: add relative path support and files and symbolic links
     path_tokens= path[1:].split("/")
     path_tokens = [token for token in path_tokens if token !=""]
 
     return path_tokens
 
 def stat(path):
-    # for now only accepts absolute dir
     #TODO: add support files and symbolic links
     path_tokens= tokenize_path(resolve_path(path))
     target_token = path_tokens.pop() if path_tokens else "."
@@ -382,7 +380,7 @@ def filesystem_mkfs():
     root_inode = create_inode(Inode_Type.DIR)
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
 
-    #TODO:create the root directory table in memory
+    #create the root directory table in memory
     DISK_MEMORY[INODE_OFFSET] = [root_inode]
     DISK_MEMORY[DATA_OFFSET] = root_dir_table # write the table into memory
     #looks stupid why not just store the inode after data is stored? but empty inodes are created first
