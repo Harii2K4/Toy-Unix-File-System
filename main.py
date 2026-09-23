@@ -356,6 +356,7 @@ def mkdir(path):
     write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
     return
 
+
 def cd(path):
     cand_path = resolve_path(path)
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
@@ -365,7 +366,17 @@ def cd(path):
     walk(root_dir_table,path_tokens,0)
 
     global curr_dir
-    curr_dir = cand_path
+    cand_path_tokens=[]
+    for idx in range(0,len(path_tokens)):
+        if path_tokens[idx] == ".":
+            continue
+        elif path_tokens[idx] == "..":
+            cand_path_tokens.pop()
+        else:
+            cand_path_tokens.append(path_tokens[idx])
+
+    cleaned_cand_path = "/"+"/".join(cand_path_tokens)
+    curr_dir = cleaned_cand_path
 
 def filesystem_mkfs():
     root_inode = create_inode(Inode_Type.DIR)
@@ -405,10 +416,13 @@ def parser_init():
     cd_parser = subparsers.add_parser('cd', help='Change the current working directory')
     cd_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
+    pwd_parser = subparsers.add_parser('pwd', help='Print the name of the current working directory')
+
     stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
     stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
     return parser
+
 
 def main():
     global curr_dir
@@ -430,7 +444,12 @@ def main():
             case "exit":
                 return
             case "cd":
-                cd(parsed_args.path)
+                try:
+                    cd(parsed_args.path)
+                except Exception as e:
+                    print(f"cd: cannot access {parsed_args.path}: {e}")
+            case "pwd":
+                print(curr_dir)
             case "mkdir":
                 try:
                     mkdir(parsed_args.path)
