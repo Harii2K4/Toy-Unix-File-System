@@ -125,7 +125,7 @@ def read_dir(data_ptrs):
 
     #This is so wrong in many diffrent ways but for now lets stick to it
     for data_ptr in data_ptrs:
-        dir_table.extend(DISK_MEMORY[data_ptr])
+        dir_table.append(read_mem(data_ptr))
 
     return dir_table
 
@@ -135,6 +135,12 @@ def read_dir_table_from_inode(inode_number):
         raise Exception("Not a directory")
     return read_dir(inode_content["data_ptrs"])
 
+def unpack_array(arr):
+    unpacked_arr = []
+    for elem in arr:
+        unpacked_arr.extend(elem)
+    del arr
+    return unpacked_arr
 
 def walk(dir_table,path_tokens,curr_idx):
     if curr_idx == len(path_tokens):
@@ -203,9 +209,9 @@ def stat(path):
         return
 
     target_token = path_tokens.pop()
-    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+    root_dir_table=unpack_array(read_dir_table_from_inode(ROOT_INODE_NUM))
 
-    parent_dir_table= walk(root_dir_table,path_tokens,0)
+    parent_dir_table=unpack_array(walk(root_dir_table,path_tokens,0))
     target_inode = [inode_number for name,inode_number in parent_dir_table if name == target_token]
     assert len(target_inode) <=1
 
@@ -251,9 +257,10 @@ def ls(path,show_hidden=False,display_table=False):
 
     if not path_tokens:
         entries=root_dir_table
-        print(entries)
     else:
         entries=walk(root_dir_table,path_tokens,0)
+
+    entries=unpack_array(entries)
 
     if not show_hidden:
         entries = filter(lambda x: not x[0].startswith("."),entries)
@@ -295,9 +302,10 @@ def mkdir(path):
         parent_dir_table=walk(root_dir_table,path_tokens,0)
 
     parent_inode_number = None
-    for name,inode_number in parent_dir_table:
+    parent_dir_table_unpacked = unpack_array(parent_dir_table)
+    for name,inode_number in parent_dir_table_unpacked:
         if name == ".":
-            parent_inode_number =inode_number
+            parent_inode_number = inode_number
             break
     assert parent_inode_number is not None
     parent_inode = get_inode(parent_inode_number)
@@ -337,7 +345,7 @@ def mkdir(path):
         if allocated:
             break
 
-    write_dir(parent_dir_table,new_dir,new_dir_inode_number)
+    write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
     print(parent_dir_table,parent_inode_number)
     return
 
@@ -398,7 +406,6 @@ def main():
                 except Exception as e:
                     print(f"ls: cannot access {parsed_args.path}: {e}")
             case "exit":
-                print(DISK_MEMORY)
                 return
             case "mkdir":
                 mkdir(parsed_args.path)
