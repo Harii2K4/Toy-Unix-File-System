@@ -145,17 +145,20 @@ def unpack_array(arr):
     unpacked_arr = []
     for elem in arr:
         unpacked_arr.extend(elem)
-    del arr
     return unpacked_arr
 
 def walk(dir_table,path_tokens,curr_idx):
     if curr_idx == len(path_tokens):
-        return []
+        return dir_table
 
     if path_tokens[curr_idx] == ".":
         return walk(dir_table,path_tokens,curr_idx+1)
 
-    for entry in dir_table:
+    # if path_tokens[curr_idx] == "..":
+    #     return walk(dir_table,path_tokens,curr_idx+1)
+
+    unpacked_dir_table = unpack_array(dir_table)
+    for entry in unpacked_dir_table:
         name,inode_number = entry
         if path_tokens[curr_idx] == name:
             token_dir_table=read_dir_table_from_inode(inode_number)
@@ -208,15 +211,8 @@ def stat(path):
     # for now only accepts absolute dir
     #TODO: add support files and symbolic links
     path_tokens= tokenize_path(path)
-
-    if not path_tokens:
-        target_inode_obj=get_inode(ROOT_INODE_NUM)
-        print_inode(target_inode_obj,path)
-        return
-
-    target_token = path_tokens.pop()
-    root_dir_table=unpack_array(read_dir_table_from_inode(ROOT_INODE_NUM))
-
+    target_token = path_tokens.pop() if path_tokens else "."
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
     parent_dir_table=unpack_array(walk(root_dir_table,path_tokens,0))
     target_inode = [inode_number for name,inode_number in parent_dir_table if name == target_token]
     assert len(target_inode) <=1
@@ -262,11 +258,9 @@ def ls(path,show_hidden=False,display_table=False):
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
     if not path_tokens:
-        entries=root_dir_table
+        entries=unpack_array(root_dir_table)
     else:
-        entries=walk(root_dir_table,path_tokens,0)
-
-    entries=unpack_array(entries)
+        entries=unpack_array(walk(root_dir_table,path_tokens,0))
 
     if not show_hidden:
         entries = filter(lambda x: not x[0].startswith("."),entries)
@@ -302,13 +296,10 @@ def mkdir(path):
     new_dir = path_tokens.pop()
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
-    if not path_tokens:
-        parent_dir_table=root_dir_table
-    else:
-        parent_dir_table=walk(root_dir_table,path_tokens,0)
-
-    parent_inode_number = None
+    parent_dir_table=walk(root_dir_table,path_tokens,0)
     parent_dir_table_unpacked = unpack_array(parent_dir_table)
+    parent_inode_number = None
+
     for name,inode_number in parent_dir_table_unpacked:
         if name == ".":
             parent_inode_number = inode_number
@@ -352,7 +343,6 @@ def mkdir(path):
             break
 
     write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
-    print(parent_dir_table,parent_inode_number)
     return
 
 def filesystem_mkfs():
@@ -414,7 +404,10 @@ def main():
             case "exit":
                 return
             case "mkdir":
-                mkdir(parsed_args.path)
+                try:
+                    mkdir(parsed_args.path)
+                except Exception as e:
+                    print(f"mkdir: cannot access {parsed_args.path}: {e}")
             case "stat":
                 try:
                     stat(parsed_args.path)
