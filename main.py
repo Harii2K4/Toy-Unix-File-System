@@ -282,9 +282,9 @@ def ls(path,show_hidden=False,display_table=False):
         for name,inode in inode_objs:
             obj_type=inode['mode'][0]
             hidden = True if name.startswith(".") else False
-            pretty_print(name,e,obj_type,hidden,end="\n")
+            pretty_print(name,obj_type,hidden,end=" ")
+        print()
 
-    print()
 
 def mkdir(path):
     #1)Increment link count of parent
