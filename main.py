@@ -2,7 +2,9 @@ from datetime import datetime,UTC
 from enum import Enum
 import math
 import sys
+import os
 import argparse
+
 
 #this is the root user
 USERS = {1:"zora"}
@@ -89,7 +91,16 @@ def create_inode(i_type:Inode_Type):
 
 
 #Access Functions
+def resolve_path(path):
+    path=path.strip(" ")
 
+    if path.startswith("/"):
+        return path
+
+    global curr_dir
+    path_resolved = os.path.join(curr_dir,path)
+
+    return path_resolved
 
 def get_inode(inode_number):
 
@@ -154,9 +165,6 @@ def walk(dir_table,path_tokens,curr_idx):
     if path_tokens[curr_idx] == ".":
         return walk(dir_table,path_tokens,curr_idx+1)
 
-    # if path_tokens[curr_idx] == "..":
-    #     return walk(dir_table,path_tokens,curr_idx+1)
-
     unpacked_dir_table = unpack_array(dir_table)
     for entry in unpacked_dir_table:
         name,inode_number = entry
@@ -210,7 +218,7 @@ def tokenize_path(path):
 def stat(path):
     # for now only accepts absolute dir
     #TODO: add support files and symbolic links
-    path_tokens= tokenize_path(path)
+    path_tokens= tokenize_path(resolve_path(path))
     target_token = path_tokens.pop() if path_tokens else "."
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
     parent_dir_table=unpack_array(walk(root_dir_table,path_tokens,0))
@@ -254,7 +262,7 @@ def pretty_print(content,obj_type,hidden,end=" "):
             prBlue(content,end=end)
 
 def ls(path,show_hidden=False,display_table=False):
-    path_tokens= tokenize_path(path)
+    path_tokens= tokenize_path(resolve_path(path))
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
     if not path_tokens:
@@ -292,7 +300,7 @@ def mkdir(path):
     #3)add the name,inode to parent
     #Done in this order to recover from crashes (got it so wrong the first time)
 
-    path_tokens = tokenize_path(path)
+    path_tokens = tokenize_path(resolve_path(path))
     try :
         new_dir = path_tokens.pop()
     except IndexError:
@@ -348,6 +356,17 @@ def mkdir(path):
     write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
     return
 
+def cd(path):
+    cand_path = resolve_path(path)
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+    path_tokens = tokenize_path(cand_path)
+
+    #will throw error if the path is invalid
+    walk(root_dir_table,path_tokens,0)
+
+    global curr_dir
+    curr_dir = cand_path
+
 def filesystem_mkfs():
     root_inode = create_inode(Inode_Type.DIR)
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
@@ -380,8 +399,11 @@ def parser_init():
     ls_parser.add_argument('-a',default=False,action='store_true')
     ls_parser.add_argument('-l',default=False,action='store_true')
 
-    ls_parser = subparsers.add_parser('mkdir', help='Creat a new directory')
+    ls_parser = subparsers.add_parser('mkdir', help='Create a new directory')
     ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
+
+    cd_parser = subparsers.add_parser('cd', help='Change the current working directory')
+    cd_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
     stat_parser= subparsers.add_parser('stat', help='Display file or file system status')
     stat_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
@@ -389,6 +411,7 @@ def parser_init():
     return parser
 
 def main():
+    global curr_dir
     parser=parser_init()
 
     while True:
@@ -406,6 +429,8 @@ def main():
                     print(f"ls: cannot access {parsed_args.path}: {e}")
             case "exit":
                 return
+            case "cd":
+                cd(parsed_args.path)
             case "mkdir":
                 try:
                     mkdir(parsed_args.path)
