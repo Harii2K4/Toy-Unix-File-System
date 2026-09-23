@@ -409,7 +409,7 @@ def parser_init():
     ls_parser.add_argument('-l',default=False,action='store_true')
 
     ls_parser = subparsers.add_parser('mkdir', help='Create a new directory')
-    ls_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
+    ls_parser.add_argument('paths',nargs="+",help="file/dir path")
 
     cd_parser = subparsers.add_parser('cd', help='Change the current working directory')
     cd_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
@@ -450,7 +450,8 @@ def main():
                 print(curr_dir)
             case "mkdir":
                 try:
-                    mkdir(parsed_args.path)
+                   for path in parsed_args.paths:
+                       mkdir(path)
                 except Exception as e:
                     print(f"mkdir: cannot create directory {parsed_args.path}: {e}")
             case "stat":
