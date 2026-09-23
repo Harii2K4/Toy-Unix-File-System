@@ -293,7 +293,10 @@ def mkdir(path):
     #Done in this order to recover from crashes (got it so wrong the first time)
 
     path_tokens = tokenize_path(path)
-    new_dir = path_tokens.pop()
+    try :
+        new_dir = path_tokens.pop()
+    except IndexError:
+        raise Exception("File exists")
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
     parent_dir_table=walk(root_dir_table,path_tokens,0)
@@ -407,7 +410,7 @@ def main():
                 try:
                     mkdir(parsed_args.path)
                 except Exception as e:
-                    print(f"mkdir: cannot access {parsed_args.path}: {e}")
+                    print(f"mkdir: cannot create directory {parsed_args.path}: {e}")
             case "stat":
                 try:
                     stat(parsed_args.path)
