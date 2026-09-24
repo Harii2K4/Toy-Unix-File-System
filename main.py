@@ -23,7 +23,9 @@ INODE_OFFSET_MEM = INODE_OFFSET * BLOCK_SIZE
 INODE_COUNT = 0
 ROOT_INODE_NUM = 0
 INODE_SIZE= 256 # 256 bytes
-INODES_PER_BLOCK = BLOCK_SIZE // 256 # 16 inodes for block
+INODES_PER_BLOCK = BLOCK_SIZE // INODE_SIZE # 16 inodes for block
+INODE_BITMAP = 1
+DATA_BITMAP = 2
 
 # Idx 0 is the Super Block
 # Idx 1-2 are the bitmap blocks
@@ -34,6 +36,21 @@ DISK_MEMORY = [None] * MEM_BLOCK_COUNT
 #Global Variables
 curr_dir = "/"
 
+def memory_init():
+    global DISK_MEMORY,INODE_OFFSET,DATA_OFFSET,INODES_PER_BLOCK
+
+    for idx in range(INODE_OFFSET,DATA_OFFSET):
+        DISK_MEMORY[idx]=[[]] * INODES_PER_BLOCK
+
+    for idx in range(DATA_OFFSET,len(DISK_MEMORY)):
+        DISK_MEMORY[idx]=[]
+
+    #bit-maps
+    data_bitmap = [0]*(len(DISK_MEMORY) - DATA_OFFSET)
+    inode_bitmap = [0]*(INODES_PER_BLOCK)*(DATA_OFFSET - INODE_OFFSET)
+
+    DISK_MEMORY[INODE_BITMAP]=inode_bitmap
+    DISK_MEMORY[DATA_BITMAP] = data_bitmap
 
 class Inode_Type(Enum):
     FILE = 1
@@ -50,6 +67,24 @@ def prCyan(s, end="\n"):
     print("\033[96m{}\033[00m".format(s), end=end)
 
 #FileSystem Internal DS
+def get_free_inode_block():
+    for idx,val in enumerate(DISK_MEMORY[INODE_BITMAP]):
+        if val == 0:
+           disk_block_idx=INODE_OFFSET+(idx//INODES_PER_BLOCK)
+           partition_in_block=idx%INODES_PER_BLOCK
+           DISK_MEMORY[INODE_BITMAP][idx]=1
+           return DISK_MEMORY[disk_block_idx],partition_in_block
+
+    raise Exception("Failed to create inode memory is full")
+
+def get_free_data_block_idx():
+    for idx,val in enumerate(DISK_MEMORY[DATA_BITMAP]):
+        if val == 0:
+            DISK_MEMORY[DATA_BITMAP][idx] = 1
+            return DATA_OFFSET+idx
+
+    raise Exception("Failed to store data memory is full")
+
 def create_inode(i_type:Inode_Type):
     global INODE_COUNT
     node_number = INODE_COUNT
@@ -294,8 +329,10 @@ def ls(path,show_hidden=False,display_table=False):
 
 def mkdir(path):
     #1)Increment link count of parent
-    #2)Create new_dir inode and dir_table
-    #3)add the name,inode to parent
+    #2)read and update the bitmaps of inode and data
+    #3)Create new_dir inode and dir_table
+    #4)add the name,inode to parent
+    #5)Change access time of parent
     #Done in this order to recover from crashes (got it so wrong the first time)
 
     path_tokens = tokenize_path(resolve_path(path))
@@ -316,6 +353,7 @@ def mkdir(path):
     assert parent_inode_number is not None
     parent_inode = get_inode(parent_inode_number)
     parent_inode["link_count"]+=1
+    parent_inode["a_time"] = datetime.now(UTC).timestamp()
 
     new_dir_inode = create_inode(Inode_Type.DIR)
     new_dir_inode_number = new_dir_inode["inode"]
@@ -324,10 +362,8 @@ def mkdir(path):
     new_dir_table =[(".",new_dir_inode.get("inode")),("..",parent_inode.get("inode"))]
 
     #TODO:use the bitmaps instead
-    for idx in range(DATA_OFFSET,64):
-        if DISK_MEMORY[idx] is None:
-            DISK_MEMORY[idx] = new_dir_table
-            break
+    idx = get_free_data_block_idx()
+    DISK_MEMORY[idx] = new_dir_table
 
     #TODO:get the proper sizes
     new_dir_inode["data_ptrs"].append(idx)
@@ -335,22 +371,10 @@ def mkdir(path):
     new_dir_inode["blocks"] = 1
 
     #TODO:use the bitmaps instead
-    for inode_block in range(INODE_OFFSET,DATA_OFFSET):
-        for idx in range(0,INODES_PER_BLOCK):
-            try :
-                if DISK_MEMORY[inode_block][idx] is not None:
-                    continue
-            except Exception:
-                DISK_MEMORY[inode_block].append(new_dir_inode)
-                allocated=True
-                break
-            DISK_MEMORY[inode_block][idx] = new_dir_inode
-            allocated=True
-            break
+    inode_block,idx = get_free_inode_block()
+    inode_block[idx] = new_dir_inode
 
-        if allocated:
-            break
-
+    parent_inode["m_time"] = datetime.now(UTC).timestamp()
     write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
     return
 
@@ -381,7 +405,11 @@ def filesystem_mkfs():
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
 
     #create the root directory table in memory
-    DISK_MEMORY[INODE_OFFSET] = [root_inode]
+    DISK_MEMORY[INODE_BITMAP][0] = 1
+    DISK_MEMORY[INODE_OFFSET][0] = root_inode
+    DISK_MEMORY[DATA_BITMAP][0] = 1
+    # print(f"Inode bitmap: {len(inode_bitmap)}")
+    # print(f"data bitmap: {len(data_bitmap)}")
     DISK_MEMORY[DATA_OFFSET] = root_dir_table # write the table into memory
     #looks stupid why not just store the inode after data is stored? but empty inodes are created first
     root_inode = get_inode(ROOT_INODE_NUM)
@@ -389,7 +417,6 @@ def filesystem_mkfs():
     root_inode["size"] =len(str(root_dir_table))
     root_inode["blocks"] = 1
 
-    #TODO:need the change the bitmaps
 
 #Cli parser - simple shell
 def parser_init():
@@ -421,6 +448,11 @@ def parser_init():
 
     return parser
 
+def curr_dir_for_prompt(curr_dir):
+    if curr_dir == "/":
+       return curr_dir
+
+    return curr_dir.split("/")[-1]
 
 def main():
     global curr_dir
@@ -428,7 +460,7 @@ def main():
 
     while True:
         user=USERS[CURR_UID]
-        user_input= input(f"[{user} {curr_dir}]$ ")
+        user_input= input(f"[{user} {curr_dir_for_prompt(curr_dir)}]$ ")
         input_tokens = user_input.split(" ")
 
         parsed_args=parser.parse_args(input_tokens)
@@ -453,7 +485,7 @@ def main():
                    for path in parsed_args.paths:
                        mkdir(path)
                 except Exception as e:
-                    print(f"mkdir: cannot create directory {parsed_args.path}: {e}")
+                    print(f"mkdir: cannot create directory {path}: {e}")
             case "stat":
                 try:
                     stat(parsed_args.path)
@@ -461,6 +493,6 @@ def main():
                     print(f"stat: cannot statx {parsed_args.path}: {e}")
 
 if __name__ == "__main__":
+    memory_init()
     filesystem_mkfs()
     main()
-
