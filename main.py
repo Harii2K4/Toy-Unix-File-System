@@ -4,7 +4,7 @@ import math
 import sys
 import os
 import argparse
-
+import readline
 
 #this is the root user
 USERS = {1:"zora"}
