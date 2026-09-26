@@ -244,6 +244,8 @@ def walk(dir_table,path_tokens,curr_idx):
     for entry in unpacked_dir_table:
         name,inode_number = entry
         if path_tokens[curr_idx] == name:
+            inode=get_inode(inode_number)
+            inode['a_time']=datetime.now(UTC).timestamp()
             token_dir_table=read_dir_table_from_inode(inode_number)
             return walk(token_dir_table,path_tokens,curr_idx+1)
 
@@ -294,6 +296,8 @@ def stat(path):
     path_tokens= tokenize_path(resolve_path(path))
     target_token = path_tokens.pop() if path_tokens else "."
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+    root_inode = get_inode(ROOT_INODE_NUM)
+    root_inode["a_time"] = datetime.now(UTC).timestamp()
     parent_dir_table=unpack_array(walk(root_dir_table,path_tokens,0))
     target_inode = [inode_number for name,inode_number in parent_dir_table if name == target_token]
     assert len(target_inode) <=1
@@ -337,6 +341,8 @@ def pretty_print(content,obj_type,hidden,end=" "):
 def ls(path,show_hidden=False,display_table=False):
     path_tokens= tokenize_path(resolve_path(path))
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+    root_inode = get_inode(ROOT_INODE_NUM)
+    root_inode["a_time"] = datetime.now(UTC).timestamp()
 
     if not path_tokens:
         entries=unpack_array(root_dir_table)
@@ -378,6 +384,8 @@ def mkdir_recurse(dir_table,path_tokens,curr_idx):
     for entry in unpacked_dir_table:
         name,inode_number = entry
         if path_tokens[curr_idx] == name:
+            inode = get_inode(inode_number)
+            inode["a_time"] = datetime.now(UTC).timestamp()
             token_dir_table=read_dir_table_from_inode(inode_number)
             return mkdir_recurse(token_dir_table,path_tokens,curr_idx+1)
 
