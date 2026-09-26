@@ -187,6 +187,46 @@ def read_dir_table_from_inode(inode_number):
         raise Exception("Not a directory")
     return read_dir(inode_content["data_ptrs"])
 
+def create_dir(parent_dir_table,new_dir):
+    #1)Increment link count of parent
+    #2)read and update the bitmaps of inode and data
+    #3)Create new_dir inode and dir_table
+    #4)add the name,inode to parent
+    #5)Change access time of parent
+    #Done in this order to recover from crashes (got it so wrong the first time)
+    parent_dir_table_unpacked = unpack_array(parent_dir_table)
+    parent_inode_number = None
+
+    for name,inode_number in parent_dir_table_unpacked:
+        if name == ".":
+            parent_inode_number = inode_number
+            break
+    assert parent_inode_number is not None
+    parent_inode = get_inode(parent_inode_number)
+    parent_inode["link_count"]+=1
+    parent_inode["a_time"] = datetime.now(UTC).timestamp()
+
+    new_dir_inode = create_inode(Inode_Type.DIR)
+    new_dir_inode_number = new_dir_inode["inode"]
+    allocated=False
+
+    new_dir_table =[(".",new_dir_inode.get("inode")),("..",parent_inode.get("inode"))]
+
+    idx = get_free_data_block_idx()
+    DISK_MEMORY[idx] = new_dir_table
+
+    new_dir_inode["data_ptrs"].append(idx)
+    new_dir_inode["size"] =len(str(new_dir_table))
+    new_dir_inode["blocks"] = 1
+
+    inode_block,idx = get_free_inode_block()
+    inode_block[idx] = new_dir_inode
+
+    parent_inode["m_time"] = datetime.now(UTC).timestamp()
+    write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
+
+    return [new_dir_table]
+
 def unpack_array(arr):
     unpacked_arr = []
     for elem in arr:
@@ -327,55 +367,39 @@ def ls(path,show_hidden=False,display_table=False):
         print()
 
 
-def mkdir(path):
-    #1)Increment link count of parent
-    #2)read and update the bitmaps of inode and data
-    #3)Create new_dir inode and dir_table
-    #4)add the name,inode to parent
-    #5)Change access time of parent
-    #Done in this order to recover from crashes (got it so wrong the first time)
+def mkdir_recurse(dir_table,path_tokens,curr_idx):
+    if curr_idx == len(path_tokens):
+        return dir_table
+
+    if path_tokens[curr_idx] == ".":
+        return walk(dir_table,path_tokens,curr_idx+1)
+
+    unpacked_dir_table = unpack_array(dir_table)
+    for entry in unpacked_dir_table:
+        name,inode_number = entry
+        if path_tokens[curr_idx] == name:
+            token_dir_table=read_dir_table_from_inode(inode_number)
+            return mkdir_recurse(token_dir_table,path_tokens,curr_idx+1)
+
+    new_dir_table=create_dir(dir_table,path_tokens[curr_idx])
+    return mkdir_recurse(new_dir_table,path_tokens,curr_idx+1)
+
+def mkdir(path,create_parents):
 
     path_tokens = tokenize_path(resolve_path(path))
     try :
         new_dir = path_tokens.pop()
     except IndexError:
+        #For the root dir which exists
         raise Exception("File exists")
     root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
 
-    parent_dir_table=walk(root_dir_table,path_tokens,0)
-    parent_dir_table_unpacked = unpack_array(parent_dir_table)
-    parent_inode_number = None
+    if create_parents:
+        parent_dir_table=mkdir_recurse(root_dir_table,path_tokens,0)
+    else :
+        parent_dir_table=walk(root_dir_table,path_tokens,0)
 
-    for name,inode_number in parent_dir_table_unpacked:
-        if name == ".":
-            parent_inode_number = inode_number
-            break
-    assert parent_inode_number is not None
-    parent_inode = get_inode(parent_inode_number)
-    parent_inode["link_count"]+=1
-    parent_inode["a_time"] = datetime.now(UTC).timestamp()
-
-    new_dir_inode = create_inode(Inode_Type.DIR)
-    new_dir_inode_number = new_dir_inode["inode"]
-    allocated=False
-
-    new_dir_table =[(".",new_dir_inode.get("inode")),("..",parent_inode.get("inode"))]
-
-    #TODO:use the bitmaps instead
-    idx = get_free_data_block_idx()
-    DISK_MEMORY[idx] = new_dir_table
-
-    #TODO:get the proper sizes
-    new_dir_inode["data_ptrs"].append(idx)
-    new_dir_inode["size"] =len(str(new_dir_table))
-    new_dir_inode["blocks"] = 1
-
-    #TODO:use the bitmaps instead
-    inode_block,idx = get_free_inode_block()
-    inode_block[idx] = new_dir_inode
-
-    parent_inode["m_time"] = datetime.now(UTC).timestamp()
-    write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
+    create_dir(parent_dir_table,new_dir)
     return
 
 
@@ -437,6 +461,7 @@ def parser_init():
 
     ls_parser = subparsers.add_parser('mkdir', help='Create a new directory')
     ls_parser.add_argument('paths',nargs="+",help="file/dir path")
+    ls_parser.add_argument('-p',default=False,action='store_true')
 
     cd_parser = subparsers.add_parser('cd', help='Change the current working directory')
     cd_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
@@ -483,7 +508,7 @@ def main():
             case "mkdir":
                 try:
                    for path in parsed_args.paths:
-                       mkdir(path)
+                       mkdir(path,parsed_args.p)
                 except Exception as e:
                     print(f"mkdir: cannot create directory {path}: {e}")
             case "stat":
