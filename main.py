@@ -399,7 +399,64 @@ def mkdir(path,create_parents):
     else :
         parent_dir_table=walk(root_dir_table,path_tokens,0)
 
+
     create_dir(parent_dir_table,new_dir)
+    return
+
+def rmdir(path):
+    #get the parent and the target dir tables
+    #check if the target is empty dir , if to throw error
+    #decrement link_count in parent
+    #remove the inode and dir table of the target
+    #remove the entry for the parent
+
+    path_tokens = tokenize_path(resolve_path(path))
+    try :
+        target_dir = path_tokens.pop()
+    except IndexError:
+        #For the root dir which exists
+        raise Exception("Cannot remove root")
+    root_dir_table=read_dir_table_from_inode(ROOT_INODE_NUM)
+    parent_dir_table=walk(root_dir_table,path_tokens,0)
+    parent_dir_table_unpacked=unpack_array(parent_dir_table)
+    parent_inode_number = None
+    target_inode_number = None
+
+    for name,inode_number in parent_dir_table_unpacked:
+        if name == ".":
+            parent_inode_number = inode_number
+        if name == target_dir:
+            target_inode_number = inode_number
+
+    assert parent_inode_number is not None
+    if target_inode_number is None:
+        raise Exception("No such file or dirctory")
+
+    target_dir_table=read_dir_table_from_inode(target_inode_number)
+    target_dir_table_unpacked=unpack_array(target_dir_table)
+
+    if len(target_dir_table_unpacked) != 2 :
+        raise Exception("Directory is not Empty")
+
+    parent_inode = get_inode(parent_inode_number)
+    parent_inode["link_count"]-=1
+    parent_inode["m_time"] = datetime.now(UTC).timestamp()
+
+    target_inode = get_inode(target_inode_number)
+    target_data_ptrs = target_inode['data_ptrs']
+
+    inode_block_idx = target_inode_number//INODES_PER_BLOCK
+    inode_partition_idx =target_inode_number%INODES_PER_BLOCK
+    DISK_MEMORY[INODE_BITMAP][target_inode_number] = 0
+    DISK_MEMORY[INODE_OFFSET+inode_block_idx][inode_partition_idx]=[]
+
+    for data_ptr in target_data_ptrs:
+        DISK_MEMORY[data_ptr] = []
+        DISK_MEMORY[DATA_BITMAP][data_ptr-DATA_OFFSET] = 0
+
+    for data_ptr in parent_inode['data_ptrs']:
+       DISK_MEMORY[data_ptr]=list(filter(lambda x : not x[1]==target_inode_number,DISK_MEMORY[data_ptr]))
+
     return
 
 
@@ -463,6 +520,9 @@ def parser_init():
     ls_parser.add_argument('paths',nargs="+",help="file/dir path")
     ls_parser.add_argument('-p',default=False,action='store_true')
 
+    ls_parser = subparsers.add_parser('rmdir', help='Remove a directory')
+    ls_parser.add_argument('paths',nargs="+",help="file/dir path")
+
     cd_parser = subparsers.add_parser('cd', help='Change the current working directory')
     cd_parser.add_argument('path',nargs="?",default=".",type=str,help="file/dir path")
 
@@ -511,6 +571,12 @@ def main():
                        mkdir(path,parsed_args.p)
                 except Exception as e:
                     print(f"mkdir: cannot create directory {path}: {e}")
+            case "rmdir":
+                try:
+                   for path in parsed_args.paths:
+                       rmdir(path)
+                except Exception as e:
+                    print(f"rm: failed to remove directory {path}: {e}")
             case "stat":
                 try:
                     stat(parsed_args.path)
