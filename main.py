@@ -180,6 +180,7 @@ def read_dir(data_ptrs):
 
 def read_dir_table_from_inode(inode_number):
     inode_content = get_inode(inode_number)
+    inode_content["a_time"]=datetime.now(UTC).timestamp()
     if inode_content['mode'].startswith("l") or inode_content['mode'].startswith("_"):
         raise Exception("Not a directory")
     return read_dir(inode_content["data_ptrs"])
