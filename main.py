@@ -500,13 +500,23 @@ def filesystem_mkfs():
     root_inode["size"] =len(str(root_dir_table))
     root_inode["blocks"] = 1
 
+class HelpRequested(Exception):
+    pass
+
+class Parser(argparse.ArgumentParser):
+    def exit(self, status=0, message=None):
+        if message:
+           print(message, end="")
+        raise HelpRequested
 
 #Cli parser - simple shell
 def parser_init():
-    parser = argparse.ArgumentParser(
+    parser = Parser(
                     prog='File system shell',
                     description='Simple command like to plan with the file system ',
-                    epilog='help for the help menu and exit to exit the shell')
+                    epilog='help for the help menu and exit to exit the shell',
+                    exit_on_error=False
+                    )
 
 
     subparsers=parser.add_subparsers(title="Command",dest="command",help="subparser help command")
@@ -550,7 +560,13 @@ def main():
         user_input= input(f"[{user} {curr_dir_for_prompt(curr_dir)}]$ ")
         input_tokens = user_input.split(" ")
 
-        parsed_args=parser.parse_args(input_tokens)
+        try:
+            parsed_args=parser.parse_args(input_tokens)
+        except argparse.ArgumentError as e:
+            print(f"{e} use -h")
+            continue
+        except HelpRequested :
+            continue
 
         match parsed_args.command:
             case "ls":
