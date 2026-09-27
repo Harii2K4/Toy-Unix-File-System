@@ -20,7 +20,6 @@ DATA_OFFSET = 8
 DATA_OFFSET_MEM = 8 * BLOCK_SIZE
 INODE_OFFSET = 3
 INODE_OFFSET_MEM = INODE_OFFSET * BLOCK_SIZE
-INODE_COUNT = 0
 ROOT_INODE_NUM = 0
 INODE_SIZE= 256 # 256 bytes
 INODES_PER_BLOCK = BLOCK_SIZE // INODE_SIZE # 16 inodes for block
@@ -73,7 +72,7 @@ def get_free_inode_block():
            disk_block_idx=INODE_OFFSET+(idx//INODES_PER_BLOCK)
            partition_in_block=idx%INODES_PER_BLOCK
            DISK_MEMORY[INODE_BITMAP][idx]=1
-           return DISK_MEMORY[disk_block_idx],partition_in_block
+           return DISK_MEMORY[disk_block_idx],partition_in_block,idx
 
     raise Exception("Failed to create inode memory is full")
 
@@ -85,10 +84,7 @@ def get_free_data_block_idx():
 
     raise Exception("Failed to store data memory is full")
 
-def create_inode(i_type:Inode_Type):
-    global INODE_COUNT
-    node_number = INODE_COUNT
-    INODE_COUNT+=1
+def create_inode(i_type:Inode_Type,inode_number):
     b_time=m_time =a_time = datetime.now(UTC).timestamp()
 
     match(i_type):
@@ -111,7 +107,7 @@ def create_inode(i_type:Inode_Type):
 
     #TODO:Number of Blocks,Size and Data Pointers
     return {
-            "inode": node_number,
+            "inode": inode_number,
             "link_count":link_count,
             "mode":file_type+permission_bits,
             "b_time":b_time,
@@ -169,6 +165,7 @@ def write_dir(mem_block,name,inode_number):
 
     mem_block.append((name,inode_number))
 
+
 def read_dir(data_ptrs):
     if data_ptrs is None or len(data_ptrs) == 0:
         return []
@@ -204,14 +201,13 @@ def create_dir(parent_dir_table,new_dir):
     assert parent_inode_number is not None
     parent_inode = get_inode(parent_inode_number)
     parent_inode["link_count"]+=1
-    parent_inode["a_time"] = datetime.now(UTC).timestamp()
+    parent_inode["m_time"] = datetime.now(UTC).timestamp()
 
-    new_dir_inode = create_inode(Inode_Type.DIR)
-    new_dir_inode_number = new_dir_inode["inode"]
-    allocated=False
+    inode_block,partition_idx,new_dir_inode_number= get_free_inode_block()
+    new_dir_inode = create_inode(Inode_Type.DIR,inode_number)
+    inode_block[partition_idx] = new_dir_inode
 
     new_dir_table =[(".",new_dir_inode.get("inode")),("..",parent_inode.get("inode"))]
-
     idx = get_free_data_block_idx()
     DISK_MEMORY[idx] = new_dir_table
 
@@ -219,12 +215,7 @@ def create_dir(parent_dir_table,new_dir):
     new_dir_inode["size"] =len(str(new_dir_table))
     new_dir_inode["blocks"] = 1
 
-    inode_block,idx = get_free_inode_block()
-    inode_block[idx] = new_dir_inode
-
-    parent_inode["m_time"] = datetime.now(UTC).timestamp()
     write_dir(parent_dir_table[-1],new_dir,new_dir_inode_number)
-
     return [new_dir_table]
 
 def unpack_array(arr):
@@ -433,7 +424,7 @@ def cd(path):
     curr_dir = cleaned_cand_path
 
 def filesystem_mkfs():
-    root_inode = create_inode(Inode_Type.DIR)
+    root_inode = create_inode(Inode_Type.DIR,ROOT_INODE_NUM)
     root_dir_table=[(".",root_inode.get("inode")),("..",root_inode.get("inode"))]
 
     #create the root directory table in memory
