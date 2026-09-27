@@ -370,7 +370,7 @@ def mkdir_recurse(dir_table,path_tokens,curr_idx):
         return dir_table
 
     if path_tokens[curr_idx] == ".":
-        return walk(dir_table,path_tokens,curr_idx+1)
+        return mkdir_recurse(dir_table,path_tokens,curr_idx+1)
 
     unpacked_dir_table = unpack_array(dir_table)
     for entry in unpacked_dir_table:
