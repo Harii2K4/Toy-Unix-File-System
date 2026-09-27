@@ -147,7 +147,10 @@ def get_inode(inode_number):
 
     idx= inode_number % INODES_PER_BLOCK
     try :
-        return inode_array[idx]
+        inode = inode_array[idx]
+        if inode == []:
+            raise Exception("No such file or directory")
+        return inode
     except IndexError:
         raise Exception("No such file or directory")
 
@@ -458,7 +461,6 @@ def rmdir(path):
        DISK_MEMORY[data_ptr]=list(filter(lambda x : not x[1]==target_inode_number,DISK_MEMORY[data_ptr]))
 
     return
-
 
 def cd(path):
     cand_path = resolve_path(path)
