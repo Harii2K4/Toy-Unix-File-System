@@ -18,6 +18,9 @@ Commands :
     iter 2 :rm (-r), echo   
     iter 3 :cat , ln
 
+
+The underlying INODECOUNT-vs-bitmap divergence needs to be fixed 
+
     
 
 

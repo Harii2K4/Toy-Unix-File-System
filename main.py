@@ -87,6 +87,7 @@ def get_free_data_block_idx():
 def create_inode(i_type:Inode_Type,inode_number):
     b_time=m_time =a_time = datetime.now(UTC).timestamp()
 
+    #each number in a octal
     match(i_type):
         case Inode_Type.FILE:
             link_count = 1
@@ -100,10 +101,6 @@ def create_inode(i_type:Inode_Type,inode_number):
             link_count = 2
             file_type = "d"
             permission_bits = "755"
-
-    #each number in a octal
-    permission_bits = "644"
-
 
     #TODO:Number of Blocks,Size and Data Pointers
     return {
